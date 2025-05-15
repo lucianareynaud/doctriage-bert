@@ -1,0 +1,12 @@
+# DVC state
+.dvc/
+.dvcignore
+
+# Python virtualenv
+.venv/
+__pycache__/
+*.py[cod]
+
+# Editor files
+.env
+.vscode/
