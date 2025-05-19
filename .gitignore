@@ -11,3 +11,4 @@ __pycache__/
 .env
 .vscode/
 /data
+.DS_Store
