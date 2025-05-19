@@ -7,14 +7,14 @@ services:
       dockerfile: Dockerfile
     container_name: doctriage-api
     ports:
-      - "8000:8000"
+      - "8181:8000"
     volumes:
       - ./data:/app/data
       - ./models:/app/models
       - ./outputs:/app/outputs
       - ./uploads:/app/uploads
     environment:
-      - MODEL_PATH=/app/outputs/distil-lora-4bit
+      - MODEL_PATH=/app/outputs/distil-lora-4bit-20250519-182259
       - UPLOAD_DIR=/app/uploads
       - PYTHONPATH=/app
     command: uvicorn src.api:app --host 0.0.0.0 --port 8000
@@ -37,7 +37,7 @@ services:
       - ./outputs:/app/outputs
       - ./src:/app/src
     environment:
-      - API_URL=http://api:8000
+      - API_URL=http://api:8000  # Internal Docker network still uses port 8000
       - PYTHONPATH=/app
     command: streamlit run src/app.py --server.port=8501 --server.address=0.0.0.0
     depends_on:
