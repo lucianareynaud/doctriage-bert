@@ -25,6 +25,9 @@ def parse_args():
     parser.add_argument("--train_data", default="data/train_valid", help="Path to training data")
     parser.add_argument("--test_data", default="data/test", help="Path to test data")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--gpu", action="store_true", help="Use GPU if available (default is CPU mode)")
+    parser.add_argument("--gradient_checkpointing", action="store_true", default=True, help="Use gradient checkpointing to save memory")
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=4, help="Number of steps for gradient accumulation")
     return parser.parse_args()
 
 
@@ -61,31 +64,56 @@ def compute_metrics(eval_pred):
 def main():
     args = parse_args()
 
-    # 1) Load tokenizer & base model with 4-bit quantization
+    # 1) Load tokenizer & base model
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     
-    # Configure 4-bit quantization
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16
-    )
+    # Check if MPS (Apple Silicon GPU) is available
+    mps_available = hasattr(torch, 'mps') and torch.mps.is_available()
     
-    base_model = AutoModelForSequenceClassification.from_pretrained(
-        args.model, 
-        num_labels=2,
-        quantization_config=bnb_config
-    )
+    # Determine device map strategy
+    if args.gpu and torch.cuda.is_available():
+        print("Using GPU with 4-bit quantization")
+        # Configure 4-bit quantization for CUDA GPU
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16
+        )
+        
+        base_model = AutoModelForSequenceClassification.from_pretrained(
+            args.model, 
+            num_labels=2,
+            quantization_config=bnb_config,
+            device_map="auto"
+        )
+    elif args.gpu and mps_available:
+        print("Using Mac GPU (MPS) - Note: Limited acceleration without quantization")
+        base_model = AutoModelForSequenceClassification.from_pretrained(
+            args.model, 
+            num_labels=2
+        ).to("mps")
+    else:
+        print("Using CPU-only mode")
+        base_model = AutoModelForSequenceClassification.from_pretrained(
+            args.model, 
+            num_labels=2
+        )
+    
+    # Enable gradient checkpointing to save memory
+    if args.gradient_checkpointing:
+        base_model.gradient_checkpointing_enable()
 
     # 2) Apply LoRA
+    print("Applying LoRA adapter")
     peft_config = LoraConfig(
         task_type=TaskType.SEQ_CLS,
         inference_mode=False,
         r=8,
         lora_alpha=32,
         lora_dropout=0.05,
-        target_modules=["q_proj", "k_proj", "v_proj", "out_proj"]
+        # For DistilBERT, use these target modules
+        target_modules=["q_lin", "k_lin", "v_lin", "out_lin"] if "distilbert" in args.model.lower() else ["q_proj", "k_proj", "v_proj", "out_proj"]
     )
     model = get_peft_model(base_model, peft_config)
 
@@ -133,6 +161,7 @@ def main():
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         learning_rate=args.lr,
         logging_steps=10,
         evaluation_strategy="epoch",
@@ -140,10 +169,19 @@ def main():
         load_best_model_at_end=True,
         push_to_hub=False,
         remove_unused_columns=True,
-        fp16=False,  # Not needed with 4-bit quantization
-        bf16=False,  # Not needed with 4-bit quantization
+        # Optimize memory usage
+        fp16=torch.cuda.is_available() and args.gpu,
+        bf16=False,
+        optim="adamw_torch",  # Memory-efficient optimizer
         seed=args.seed,
-        report_to="none"
+        report_to="none",
+        # Only use GPU if explicitly requested
+        no_cuda=not args.gpu,
+        # Enable gradient checkpointing (save memory during backprop)
+        gradient_checkpointing=args.gradient_checkpointing,
+        # Efficient caching
+        dataloader_num_workers=0,  # Better for macOS
+        dataloader_pin_memory=False  # Better for limited RAM
     )
 
     # 5) Trainer setup

@@ -13,6 +13,43 @@ DocTriage-BERT ingests PDFs by domain, extracts text using Tesseract OCR, shards
 5. **Human-in-the-loop Review** with Argilla
 6. **Inference API & Streamlit UI**
 
+## System Architecture
+
+```mermaid
+graph TD
+    subgraph Data_Processing
+        A[Raw PDFs] -->|OCR & Extraction| B[Ingest_domains.py]
+        B --> C[Parquet Shards]
+    end
+
+    subgraph Model_Training
+        C -->|Train/Valid Split| D[train.py]
+        D -->|LoRA Fine-tuning| E[DistilBERT Base]
+        E -->|4-bit Quantization<br>for GPU mode| F[Trained Model]
+        E -->|CPU-optimized<br>Default mode| F
+    end
+
+    subgraph Deployment
+        F --> G[FastAPI Backend]
+        G --> H[Streamlit UI]
+        G --> I[Argilla Review]
+        I -->|Human Feedback| J[Model Improvement]
+        J --> D
+    end
+
+    subgraph Resource_Optimization
+        K[MacBook Compatibility] -->|CPU Default| L[Gradient Checkpointing]
+        K -->|Memory Efficiency| M[Gradient Accumulation]
+        K -->|Apple Silicon| N[MPS Fallback]
+    end
+```
+
+## Resource Budget Strategy
+- **RAM:** 9 GB - 4-bit quantization + LoRA + gradient checkpointing + small batches
+- **Disk:** 37 GB - Streaming HF Datasets + ONNX-lite export + tight Docker layering
+- **CPU:** Mac M-series - device_map="auto", MPS fallback when available
+- **Default Mode:** CPU-only for MacBook compatibility
+
 ---
 
 ## Quickstart
@@ -76,12 +113,22 @@ python src/ingest_domains.py \
 #### 4. Train & Evaluate
 
 ```bash
+# CPU mode (default, optimized for MacBooks)
 python src/train.py \
   --model distilbert-base-uncased \
   --output_dir outputs/distil-lora-4bit \
   --epochs 3 \
   --batch_size 4 \
   --lr 2e-5
+
+# GPU mode (if available)
+python src/train.py \
+  --model distilbert-base-uncased \
+  --output_dir outputs/distil-lora-4bit \
+  --epochs 3 \
+  --batch_size 4 \
+  --lr 2e-5 \
+  --gpu
 ```
 
 #### 5. Start Services
@@ -107,7 +154,7 @@ docker-compose up
 │   └── test/             # test shards
 ├── src/
 │   ├── ingest_domains.py # PDF processing with Tesseract OCR
-│   ├── train.py          # model training
+│   ├── train.py          # model training (CPU by default)
 │   ├── api.py            # FastAPI backend
 │   ├── app.py            # Streamlit UI
 │   ├── log_for_review.py # Argilla integration

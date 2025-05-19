@@ -181,16 +181,19 @@ if [ "$need_training" = true ]; then
     echo -e "- Learning rate: ${BOLD}$learning_rate${NC}"
     echo -e "- Output directory: ${BOLD}$output_dir${NC}"
 
-    # Run the training command in Docker
-    echo -e "\n${YELLOW}Training model...${NC}"
-    docker run --rm --gpus all -v "$(pwd):/app" doctriage-bert-api:latest python src/train.py \
+    # Run the training command in Docker (defaults to CPU mode for MacBook compatibility)
+    echo -e "\n${YELLOW}Training model (optimized for MacBook)...${NC}"
+    echo -e "${GREEN}Using CPU-optimized mode with gradient checkpointing and accumulation...${NC}"
+    
+    docker run --rm -v "$(pwd):/app" doctriage-bert-api:latest python src/train.py \
         --model $model_name \
         --output_dir $model_path \
         --epochs $epochs \
         --batch_size $batch_size \
         --lr $learning_rate \
         --train_data /app/data/train_valid \
-        --test_data /app/data/test
+        --test_data /app/data/test \
+        --gradient_accumulation_steps 4
 
     echo -e "${GREEN}Training complete!${NC}"
 fi
