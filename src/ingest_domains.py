@@ -88,39 +88,61 @@ def pdf_to_text(path: str) -> str:
     if that yields no text, falls back to Tesseract OCR on each page image.
     Includes image enhancement for better OCR results.
     """
-    doc = PdfDocument(path)
-    texts = []
-    
-    logger.info(f"Processing PDF: {path}")
-    
-    for page_idx, page in enumerate(doc):
-        # Try embedded text first
-        raw = page.get_textpage().get_text_range()
-        if raw and len(raw.strip()) > 50:  # Check if reasonable amount of text
-            logger.debug(f"Page {page_idx+1}: Using embedded text")
-            texts.append(raw)
-        else:
-            # Fallback to OCR
-            logger.debug(f"Page {page_idx+1}: Using OCR")
-            bitmap = page.render(
-                scale=2.0,  # Increase resolution for better OCR
-                rotation=0,
-                crop=None
-            )
-            pil_img = bitmap.to_pil()
-            
-            # Enhance image for better OCR results
-            enhanced_img = enhance_image_for_ocr(pil_img)
-            
-            ocr_text = pytesseract.image_to_string(
-                enhanced_img, 
-                config='--oem 3 --psm 6'
-            )
-            texts.append(ocr_text)
-    
-    full_text = "\n".join(texts)
-    logger.info(f"Extracted {len(full_text)} characters from {path}")
-    return full_text
+    doc = None
+    try:
+        doc = PdfDocument(path)
+        texts = []
+        logger.info(f"Processing PDF: {path}")
+        try:
+            for page_idx, page in enumerate(doc):
+                try:
+                    # Try embedded text first
+                    raw = page.get_textpage().get_text_range()
+                    if raw and len(raw.strip()) > 50:  # Check if reasonable amount of text
+                        logger.debug(f"Page {page_idx+1}: Using embedded text")
+                        texts.append(raw)
+                    else:
+                        # Fallback to OCR
+                        logger.debug(f"Page {page_idx+1}: Using OCR")
+                        try:
+                            bitmap = page.render(
+                                scale=2.0,  # Increase resolution for better OCR
+                                rotation=0,
+                                crop=None
+                            )
+                            pil_img = bitmap.to_pil()
+                            # Enhance image for better OCR results
+                            enhanced_img = enhance_image_for_ocr(pil_img)
+                            ocr_text = pytesseract.image_to_string(
+                                enhanced_img, 
+                                config='--oem 3 --psm 6'
+                            )
+                            texts.append(ocr_text)
+                        except Exception as e:
+                            logger.error(f"OCR error on page {page_idx+1}: {str(e)}")
+                            texts.append(f"[OCR ERROR ON PAGE {page_idx+1}]")
+                except Exception as e:
+                    logger.error(f"Error processing page {page_idx+1}: {str(e)}")
+                    texts.append(f"[ERROR PROCESSING PAGE {page_idx+1}]")
+        except Exception as e:
+            logger.error(f"Error iterating through PDF pages: {str(e)}")
+            try:
+                logger.info(f"Trying to recover. PDF has {len(doc)} pages.")
+                texts.append(f"[PDF PROCESSING ERROR: {str(e)}]")
+            except:
+                texts.append(f"[SEVERE PDF ERROR: {str(e)}]")
+        full_text = "\n".join(texts) if texts else f"[FAILED TO EXTRACT TEXT FROM {path}]"
+        logger.info(f"Extracted {len(full_text)} characters from {path}")
+        return full_text
+    except Exception as e:
+        logger.error(f"Critical error processing PDF {path}: {str(e)}")
+        return f"[CRITICAL PDF ERROR: {str(e)}]"
+    finally:
+        if doc is not None:
+            try:
+                doc.close()
+            except Exception as e:
+                logger.warning(f"Error closing PDF document: {str(e)}")
 
 
 def ingest_domain(domain: str, input_dir: str, output_dir: str):

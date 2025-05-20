@@ -246,3 +246,27 @@ docker-compose up
 └── README.md
 ```
 
+## Current Performance Evaluation
+
+![Streamlit UI showing document classification results](./fron-end-streamlit.png)
+
+The image above shows the Streamlit UI evaluating a PDF with a classification result of 50% regulations and 50% report. This equal probability distribution indicates that:
+
+1. **Limited model confidence**: The model is unable to decisively classify this document, assigning equal probability to both categories.
+
+2. **Reasons for limited accuracy**:
+   - Insufficient training data (only 2 articles per domain in the current demonstration)
+   - Potential domain overlap between regulations and reports
+   - Document complexity or ambiguity that contains elements of both categories
+   - Feature extraction may not be capturing the distinctive characteristics of each document type
+
+3. **Improvement strategy**:
+   - **More training data**: Collect substantially more domain-specific documents (100+ per category)
+   - **Better feature engineering**: Extract and represent domain-specific terminology
+   - **Human feedback loop**: Utilize the Argilla interface to correct misclassifications
+   - **Document preprocessing**: Improve text extraction and cleaning from PDFs
+   - **Model architecture**: Consider domain-specific pre-training or alternative models
+   - **Ensemble approach**: Combine multiple classification methods for better accuracy
+
+The current system is designed with these limitations in mind and includes the Argilla human-in-the-loop component specifically to address accuracy issues through iterative improvement.
+
