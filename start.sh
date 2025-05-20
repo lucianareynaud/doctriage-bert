@@ -210,7 +210,7 @@ docker-compose up -d
 
 echo -e "\n${BOLD}${GREEN}DocTriage-BERT is now running!${NC}"
 echo -e "Access the services at:"
-echo -e "   - API: http://localhost:8000"
+echo -e "   - API: http://localhost:8181"
 echo -e "   - Streamlit UI: http://localhost:8501"
 echo -e "   - Argilla: http://localhost:6900"
 echo -e "\nTo stop the services, run: ${YELLOW}docker-compose down${NC}"

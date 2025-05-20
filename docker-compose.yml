@@ -14,7 +14,7 @@ services:
       - ./outputs:/app/outputs
       - ./uploads:/app/uploads
     environment:
-      - MODEL_PATH=/app/outputs/distil-lora-4bit-20250519-182259
+      - MODEL_PATH=/app/outputs/distil-lora-4bit-20250520-113149
       - UPLOAD_DIR=/app/uploads
       - PYTHONPATH=/app
     command: uvicorn src.api:app --host 0.0.0.0 --port 8000

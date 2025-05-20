@@ -12,6 +12,7 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 from pathlib import Path
 import logging
+from argilla import ApiClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -46,11 +47,20 @@ def parse_args():
         "--feedback-status", type=str, default="submitted",
         help="Filter records by feedback status (e.g., 'submitted', 'discarded', 'draft')"
     )
+    parser.add_argument(
+        "--export", action="store_true",
+        help="Export annotated data for retraining"
+    )
+    parser.add_argument(
+        "--export-dir", type=str, default="data/feedback",
+        help="Directory to save exported data for retraining"
+    )
     return parser.parse_args()
 
 def init_argilla(args):
     """Initialize Argilla client."""
-    rg.init(
+    # Configure Argilla client
+    api_client = ApiClient(
         api_url=args.argilla_api_url,
         api_key=args.api_key,
         workspace=args.workspace
@@ -58,7 +68,10 @@ def init_argilla(args):
     
     # Get dataset
     try:
-        dataset = rg.load_dataset(args.dataset_name)
+        dataset = rg.FeedbackDataset.from_argilla(
+            name=args.dataset_name,
+            api_client=api_client
+        )
         logger.info(f"Loaded dataset: {args.dataset_name} with {len(dataset)} records")
         return dataset
     except Exception as e:
@@ -319,19 +332,45 @@ def generate_report(analyses, args):
     logger.info(f"Report generated in {args.output_dir}")
     logger.info(f"Open {os.path.join(args.output_dir, 'evaluation_report.html')} to view the results")
 
+def export_for_retraining(df, args):
+    """Export annotated data for retraining the model."""
+    # Create export directory
+    os.makedirs(args.export_dir, exist_ok=True)
+    
+    # Prepare data for retraining - using human annotations as ground truth
+    export_data = df[["text", "annotation"]].copy()
+    export_data.columns = ["text", "domain"]  # Match expected column names for training
+    
+    # Save as parquet file - one for 'reports' and one for 'regulations'
+    for domain in ["reports", "regulations"]:
+        domain_data = export_data[export_data["domain"] == domain]
+        if not domain_data.empty:
+            output_file = os.path.join(args.export_dir, f"{domain}.parquet")
+            domain_data.to_parquet(output_file)
+            logger.info(f"Exported {len(domain_data)} {domain} records to {output_file}")
+
 def main():
     args = parse_args()
     
-    # Initialize Argilla
+    # Initialize Argilla and load data
     dataset = init_argilla(args)
-    
-    # Load records
     df = load_records(dataset, args)
     
-    if len(df) == 0:
-        logger.warning(f"No records found with status '{args.feedback_status}'. Nothing to evaluate.")
-        return
+    # Check if we should export data for retraining
+    if args.export:
+        export_for_retraining(df, args)
+        logger.info(f"Exported annotated data to {args.export_dir}")
+        if not df.empty:
+            logger.info("To retrain with the exported data, run:")
+            logger.info(f"python src/train.py --train_data {args.export_dir}")
+        else:
+            logger.warning("No data found to export. Make corrections in Argilla first.")
+        
+        # If only exporting, we can exit here
+        if len(df) == 0 or df["corrected"].sum() == 0:
+            return
     
+    # Continue with evaluation and reporting
     # Run analyses
     correction_analysis = analyze_corrections(df)
     confidence_analysis = analyze_confidence(df)

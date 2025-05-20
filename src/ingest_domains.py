@@ -102,11 +102,12 @@ def pdf_to_text(path: str) -> str:
         else:
             # Fallback to OCR
             logger.debug(f"Page {page_idx+1}: Using OCR")
-            pil_img = page.render_topil(
+            bitmap = page.render(
                 scale=2.0,  # Increase resolution for better OCR
                 rotation=0,
                 crop=None
             )
+            pil_img = bitmap.to_pil()
             
             # Enhance image for better OCR results
             enhanced_img = enhance_image_for_ocr(pil_img)
