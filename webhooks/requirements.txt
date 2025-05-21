@@ -1,0 +1,3 @@
+# Requirements for the annotation pipeline
+requests>=2.25.0
+python-dateutil>=2.8.1 

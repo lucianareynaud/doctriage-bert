@@ -120,6 +120,30 @@ This is the human-in-the-loop review platform where you can:
 - Provide feedback on confidence scores
 - Help improve the model over time
 
+**Login Credentials:**
+- Username: `argilla`
+- Password: `12345678`
+
+**Automated Setup:**
+Argilla is automatically configured when you run `./start.sh` - no additional setup required. The script:
+1. Starts the Argilla server
+2. Creates the dataset with proper configuration
+3. Loads sample documents for review
+4. Handles login automatically
+
+**Continuous Improvement Pipeline:**
+The system includes a complete annotation and retraining pipeline:
+
+1. **Annotate Documents**: Use Argilla to review and correct document classifications
+2. **Process Annotations**: Run `python webhooks/process_annotations.py` to collect annotations
+3. **Automatic Retraining**: The system retrains the model with your corrections
+4. **Improved Quality**: The model continuously improves as more annotations are provided
+
+The pipeline can be automated by adding the included cron job to your system to check for annotations hourly:
+```bash
+0 * * * * cd /path/to/doctriage-bert && webhooks/check_annotations.sh
+```
+
 **For data teams:** Use this interface to validate model outputs and provide feedback data for model improvement.
 
 #### Workflow for End Users:

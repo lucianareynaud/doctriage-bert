@@ -90,34 +90,34 @@ def pdf_to_text(path: str) -> str:
     """
     doc = None
     try:
-        doc = PdfDocument(path)
-        texts = []
-        logger.info(f"Processing PDF: {path}")
+    doc = PdfDocument(path)
+    texts = []
+    logger.info(f"Processing PDF: {path}")
         try:
-            for page_idx, page in enumerate(doc):
+    for page_idx, page in enumerate(doc):
                 try:
-                    # Try embedded text first
-                    raw = page.get_textpage().get_text_range()
-                    if raw and len(raw.strip()) > 50:  # Check if reasonable amount of text
-                        logger.debug(f"Page {page_idx+1}: Using embedded text")
-                        texts.append(raw)
-                    else:
-                        # Fallback to OCR
-                        logger.debug(f"Page {page_idx+1}: Using OCR")
+        # Try embedded text first
+        raw = page.get_textpage().get_text_range()
+        if raw and len(raw.strip()) > 50:  # Check if reasonable amount of text
+            logger.debug(f"Page {page_idx+1}: Using embedded text")
+            texts.append(raw)
+        else:
+            # Fallback to OCR
+            logger.debug(f"Page {page_idx+1}: Using OCR")
                         try:
                             bitmap = page.render(
-                                scale=2.0,  # Increase resolution for better OCR
-                                rotation=0,
-                                crop=None
-                            )
+                scale=2.0,  # Increase resolution for better OCR
+                rotation=0,
+                crop=None
+            )
                             pil_img = bitmap.to_pil()
-                            # Enhance image for better OCR results
-                            enhanced_img = enhance_image_for_ocr(pil_img)
-                            ocr_text = pytesseract.image_to_string(
-                                enhanced_img, 
-                                config='--oem 3 --psm 6'
-                            )
-                            texts.append(ocr_text)
+            # Enhance image for better OCR results
+            enhanced_img = enhance_image_for_ocr(pil_img)
+            ocr_text = pytesseract.image_to_string(
+                enhanced_img, 
+                config='--oem 3 --psm 6'
+            )
+            texts.append(ocr_text)
                         except Exception as e:
                             logger.error(f"OCR error on page {page_idx+1}: {str(e)}")
                             texts.append(f"[OCR ERROR ON PAGE {page_idx+1}]")
@@ -132,8 +132,8 @@ def pdf_to_text(path: str) -> str:
             except:
                 texts.append(f"[SEVERE PDF ERROR: {str(e)}]")
         full_text = "\n".join(texts) if texts else f"[FAILED TO EXTRACT TEXT FROM {path}]"
-        logger.info(f"Extracted {len(full_text)} characters from {path}")
-        return full_text
+    logger.info(f"Extracted {len(full_text)} characters from {path}")
+    return full_text
     except Exception as e:
         logger.error(f"Critical error processing PDF {path}: {str(e)}")
         return f"[CRITICAL PDF ERROR: {str(e)}]"

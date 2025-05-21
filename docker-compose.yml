@@ -14,7 +14,7 @@ services:
       - ./outputs:/app/outputs
       - ./uploads:/app/uploads
     environment:
-      - MODEL_PATH=/app/outputs/distil-lora-4bit-20250520-152159
+      - MODEL_PATH=/app/outputs/distil-lora-4bit-20250521-115746
       - UPLOAD_DIR=/app/uploads
       - PYTHONPATH=/app
     command: uvicorn src.api:app --host 0.0.0.0 --port 8000
@@ -43,48 +43,28 @@ services:
     depends_on:
       - api
   
+  # Argilla setup with auto-login as annotator (runs Argilla v1.29.1)
   argilla:
-    image: argilla/argilla-server:v1.17.0
+    image: argilla/argilla-quickstart:latest
     container_name: doctriage-argilla
     ports:
       - "6900:6900"
-    environment:
-      - ARGILLA_HOME_PATH=/argilla
-      - ARGILLA_SERVER_HOST=0.0.0.0
-      - ARGILLA_SERVER_PORT=6900
-      - ELASTICSEARCH_HOST=elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - ARGILLA_DISABLE_TELEMETRY=1
     volumes:
-      - argilla-data:/argilla
+      - argilla-data:/app/data
+      - ./argilla_auto_login.js:/app/argilla_server/static/js/auto_login.js
+    environment:
+      - HF_TOKEN=no-token-needed-for-local-use
+      - ARGILLA_API_KEY=argilla.apikey
+      - ARGILLA_PASSWORD=12345678
+      - TEAM_API_KEY=team.apikey
+      - TEAM_PASSWORD=12345678
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6900/api/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:6900"]
       interval: 30s
       timeout: 10s
-      retries: 3
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.7
-    container_name: doctriage-elasticsearch
-    environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
-      interval: 20s
-      timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 15s
 
 volumes:
-  argilla-data:
-  elasticsearch-data: 
+  argilla-data: 

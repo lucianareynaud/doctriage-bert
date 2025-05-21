@@ -121,7 +121,7 @@ def predict_text(text: str) -> dict:
     # Garantir que o modelo está carregado
     if MODEL is None or TOKENIZER is None:
         try:
-            load_model()
+        load_model()
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
             return {
@@ -140,7 +140,7 @@ def predict_text(text: str) -> dict:
     try:
         # Tokenizar texto com tratamento de erro
         try:
-            inputs = TOKENIZER(text, return_tensors="pt", truncation=True, max_length=512)
+    inputs = TOKENIZER(text, return_tensors="pt", truncation=True, max_length=512)
             if not inputs or len(inputs) == 0:
                 logger.error("Tokenization returned empty inputs")
                 return {
@@ -153,11 +153,11 @@ def predict_text(text: str) -> dict:
                 "prediction": "unknown",
                 "confidence": 0.0
             }
-        
+    
         # Predição com tratamento robusto de erros
-        with torch.no_grad():
+    with torch.no_grad():
             try:
-                outputs = MODEL(**inputs)
+        outputs = MODEL(**inputs)
                 
                 # Verificar se outputs é None ou não tem logits
                 if outputs is None:
@@ -184,8 +184,8 @@ def predict_text(text: str) -> dict:
                     }
                 
                 # Calcular probabilidades e obter predição
-                probabilities = torch.nn.functional.softmax(logits, dim=-1)
-                prediction_idx = torch.argmax(probabilities, dim=-1).item()
+        probabilities = torch.nn.functional.softmax(logits, dim=-1)
+    prediction_idx = torch.argmax(probabilities, dim=-1).item()
                 
                 # Verificar se índice de predição é válido
                 if prediction_idx not in ID2LABEL:
@@ -195,12 +195,12 @@ def predict_text(text: str) -> dict:
                         "confidence": 0.0
                     }
                 
-                confidence = probabilities[0, prediction_idx].item()
-                prediction = ID2LABEL[prediction_idx]
-                
-                return {
-                    "prediction": prediction,
-                    "confidence": confidence
+    confidence = probabilities[0, prediction_idx].item()
+    prediction = ID2LABEL[prediction_idx]
+    
+    return {
+        "prediction": prediction,
+        "confidence": confidence
                 }
             except Exception as e:
                 logger.error(f"Error during prediction: {str(e)}")
@@ -213,7 +213,7 @@ def predict_text(text: str) -> dict:
         return {
             "prediction": "unknown",
             "confidence": 0.0
-        }
+    }
 
 def process_document_batch(job_id: str, file_paths: List[str]):
     """Process a batch of documents as a background task."""
@@ -254,7 +254,7 @@ def process_document_batch(job_id: str, file_paths: List[str]):
                 
                 # Extract text from PDF with error handling
                 try:
-                    text = pdf_to_text(file_path)
+                text = pdf_to_text(file_path)
                     if not text or not isinstance(text, str):
                         logger.warning(f"PDF extraction returned empty or invalid text for {file_path}")
                         text = "Failed to extract meaningful text from document."
@@ -267,7 +267,7 @@ def process_document_batch(job_id: str, file_paths: List[str]):
                 
                 # Get prediction with error handling
                 try:
-                    pred_result = predict_text(text)
+                pred_result = predict_text(text)
                     if not pred_result or not isinstance(pred_result, dict):
                         logger.error(f"predict_text returned invalid result: {type(pred_result)}")
                         pred_result = {"prediction": "unknown", "confidence": 0.0}
@@ -288,22 +288,22 @@ def process_document_batch(job_id: str, file_paths: List[str]):
                     }
                 except Exception as e:
                     logger.error(f"Error creating metadata for {file_path}: {str(e)}")
-                    metadata = {
-                        "filename": filename,
+                metadata = {
+                    "filename": filename,
                         "path": file_path,
                         "error": str(e),
                         "processing_status": "error"
-                    }
+                }
                 
                 # Create and add result
                 try:
-                    results.append(PredictionResult(
-                        filename=filename,
+                results.append(PredictionResult(
+                    filename=filename,
                         prediction=pred_result.get("prediction", "unknown"),
                         confidence=pred_result.get("confidence", 0.0),
-                        text_preview=text_preview,
-                        metadata=metadata
-                    ))
+                    text_preview=text_preview,
+                    metadata=metadata
+                ))
                 except Exception as e:
                     logger.error(f"Error creating result object for {file_path}: {str(e)}")
                     # Fallback para um resultado mínimo válido
@@ -388,7 +388,7 @@ async def predict_from_file(file: UploadFile = File(...)):
         logger.info(f"Processing file: {file.filename}")
         # Extract text with robust error handling
         try:
-            text = pdf_to_text(temp_file_path)
+        text = pdf_to_text(temp_file_path)
             if not text or not isinstance(text, str):
                 logger.warning(f"PDF extraction returned empty or invalid text: {type(text)}")
                 text = "Error: Failed to extract meaningful text from document."
@@ -397,7 +397,7 @@ async def predict_from_file(file: UploadFile = File(...)):
             text = "Error: Failed to extract text from document."
         # Make prediction with robust error handling
         try:
-            result = predict_text(text)
+        result = predict_text(text)
             logger.info(f"Prediction result: {result}")
             # Garantir que result não é None e tem os campos necessários
             if not result or not isinstance(result, dict):
@@ -441,7 +441,7 @@ async def predict_from_file(file: UploadFile = File(...)):
     finally:
         try:
             if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
+        shutil.rmtree(temp_dir)
         except Exception as e:
             logger.error(f"Error cleaning up temporary directory: {str(e)}")
 

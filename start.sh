@@ -16,35 +16,33 @@ echo -e "${BOLD}${BLUE}DocTriage-BERT: All-in-one Setup and Deployment${NC}\n"
 # Check if Homebrew is installed
 if ! command -v brew &> /dev/null; then
     echo -e "${RED}Homebrew is not installed! Please install Homebrew first:${NC}"
-    echo -e "${YELLOW}/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}"
+    echo -e "${YELLOW}/bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}"
     exit 1
 fi
 
 # Check if Colima is installed, if not install it
 if ! command -v colima &> /dev/null; then
-    echo -e "${YELLOW}Colima not found. Installing Colima...${NC}"
+    echo -e "${YELLOW}Colima not found. Installing...${NC}"
     brew install colima
-    echo -e "${GREEN}Colima installed successfully.${NC}"
-else
-    echo -e "${GREEN}Colima is already installed.${NC}"
 fi
 
 # Check if Docker is installed, if not install it
 if ! command -v docker &> /dev/null; then
-    echo -e "${YELLOW}Docker not found. Installing Docker CLI...${NC}"
-    brew install docker docker-compose
-    echo -e "${GREEN}Docker installed successfully.${NC}"
-else
-    echo -e "${GREEN}Docker is already installed.${NC}"
+    echo -e "${YELLOW}Docker not found. Installing...${NC}"
+    brew install docker
+fi
+
+# Check if Docker Compose is installed
+if ! command -v docker-compose &> /dev/null; then
+    echo -e "${YELLOW}Docker Compose not found. Installing...${NC}"
+    brew install docker-compose
 fi
 
 # Check if Colima is running
 if ! colima status &> /dev/null; then
-    echo -e "${YELLOW}Starting Colima with 4 CPUs, 8GB memory, and 20GB disk...${NC}"
-    colima start --cpu 4 --memory 8 --disk 20
-    echo -e "${GREEN}Colima started successfully.${NC}"
-else
-    echo -e "${GREEN}Colima is already running.${NC}"
+    echo -e "${YELLOW}Starting Colima...${NC}"
+    colima start
+    echo -e "${GREEN}Colima started successfully${NC}"
 fi
 
 # Create required directories
@@ -203,15 +201,88 @@ echo -e "${YELLOW}Updating MODEL_PATH in docker-compose.yml...${NC}"
 sed -i '' "s|MODEL_PATH=.*|MODEL_PATH=$model_path|g" docker-compose.yml
 echo -e "${GREEN}Updated MODEL_PATH to: $model_path${NC}"
 
+# Remove the authentication attempt before starting services
+# USE_ARGILLA_API is set here but used later after service is running
+USE_ARGILLA_API=true
+ARGILLA_API_URL="http://localhost:6900"
+USERNAME="argilla"
+PASSWORD="12345678"
+
 # Start the services
 echo -e "\n${BOLD}${BLUE}Starting DocTriage-BERT Services${NC}\n"
 echo -e "${YELLOW}Starting with docker-compose...${NC}"
 docker-compose up -d
 
-echo -e "\n${BOLD}${GREEN}DocTriage-BERT is now running!${NC}"
-echo -e "Access the services at:"
-echo -e "   - API: http://localhost:8181"
-echo -e "   - Streamlit UI: http://localhost:8501"
-echo -e "   - Argilla: http://localhost:6900"
-echo -e "\nTo stop the services, run: ${YELLOW}docker-compose down${NC}"
-echo -e "To stop Colima when done: ${YELLOW}colima stop${NC}" 
+# Wait for Argilla to be ready
+echo -e "${YELLOW}Waiting for Argilla to be ready...${NC}"
+MAX_RETRIES=30
+RETRY_COUNT=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -s --head --request GET http://localhost:6900/api/v1/status | grep "200 OK" > /dev/null; then
+        echo -e "${GREEN}Argilla is up and running!${NC}"
+        break
+    else
+        echo -n "."
+        RETRY_COUNT=$((RETRY_COUNT+1))
+        sleep 4
+    fi
+    
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo -e "\n${RED}Timed out waiting for Argilla to start.${NC}"
+        echo -e "${YELLOW}You can continue using the API and UI, but Argilla data annotation won't be available.${NC}"
+        break
+    fi
+done
+
+# Additional safety wait time - sometimes Argilla needs a moment after the API is responsive
+sleep 10
+
+# Now that Argilla is running, attempt to authenticate
+if [ "$USE_ARGILLA_API" = true ]; then
+    echo -e "${YELLOW}Setting up Argilla and annotation pipeline for DocTriage-BERT...${NC}"
+    
+    # Try to use the setup_argilla_simple.py script which handles authentication internally
+    python setup_argilla_simple.py --url $ARGILLA_API_URL --username $USERNAME --password $PASSWORD
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Argilla setup completed successfully!${NC}"
+    else
+        echo -e "${YELLOW}Trying alternative Argilla setup method...${NC}"
+        # Use the check_argilla.py script to verify credentials
+        python check_argilla.py
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Argilla credentials verified!${NC}"
+        else
+            echo -e "${RED}❌ Failed to verify Argilla credentials${NC}"
+            echo -e "${YELLOW}You can still access Argilla UI at: http://localhost:6900${NC}"
+            echo -e "${YELLOW}Login with username: argilla / password: 12345678${NC}"
+        fi
+    fi
+else
+    # Setup Argilla with sample data using the previous method
+    echo -e "${YELLOW}Setting up Argilla with sample data...${NC}"
+    python src/argilla_setup.py
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Argilla setup completed successfully!${NC}"
+    else
+        echo -e "${RED}Argilla setup encountered issues.${NC}"
+        echo -e "${YELLOW}You can still access Argilla UI at: http://localhost:6900${NC}"
+    fi
+fi
+
+# Show API endpoint
+echo -e "\n${BOLD}${GREEN}DocTriage-BERT services are running!${NC}"
+echo -e "${BLUE}API endpoint: http://localhost:8181/docs${NC}"
+echo -e "${BLUE}Streamlit UI: http://localhost:8501${NC}"
+echo -e "${BLUE}Argilla annotation tool: http://localhost:6900${NC}"
+
+# Display links for manual exploration
+echo -e "\n${BOLD}${BLUE}Explore the data and models:${NC}"
+echo -e "1. ${YELLOW}Use the Streamlit UI:${NC} http://localhost:8501"
+echo -e "2. ${YELLOW}Explore the API docs:${NC} http://localhost:8181/docs"
+echo -e "3. ${YELLOW}Annotate documents:${NC} http://localhost:6900"
+
+echo -e "\n${BOLD}${BLUE}To stop all services:${NC}"
+echo -e "${YELLOW}docker-compose down${NC}"
+
+echo -e "\n${GREEN}Setup complete!${NC}" 

@@ -368,7 +368,7 @@ def main():
         
         # If only exporting, we can exit here
         if len(df) == 0 or df["corrected"].sum() == 0:
-            return
+        return
     
     # Continue with evaluation and reporting
     # Run analyses
