@@ -292,5 +292,5 @@ The image above shows the Streamlit UI evaluating a PDF with a classification re
    - **Model architecture**: Consider domain-specific pre-training or alternative models
    - **Ensemble approach**: Combine multiple classification methods for better accuracy
 
-The current system is designed with these limitations in mind and includes the Argilla human-in-the-loop component specifically to address accuracy issues through iterative improvement.
+The current system is designed with these limitations in mind and includes the Argilla human-in-the-loop component specifically to address accuracy issues through iterative improvement. This is experimental software. 
 
